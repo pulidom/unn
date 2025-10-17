@@ -1,7 +1,7 @@
 #import torch
 #import numpy as np
 
-from dyn import L63 as Dyn_Mdl
+from dyn import L63
 import lossfn
 
 #device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -22,24 +22,29 @@ class dat:
     var_in=[0,2]
     var_out=[0]
     exp_dir=exp_dir
+    DynMdl=L63
+    batch_size=256
+    
 
+    
 # Define parametros de la optimizacion
 class train: 
     loss = lossfn.loss_fn #nn.MSELoss() #nn.logGaussLoss #SupervLoss # GaussLoss
-    batch_size=256
-    n_epochs = 30
+    batch_size=dat.batch_size
+    n_epochs = 200
     learning_rate = 1e-3
     exp_dir = exp_dir
-    lval = True 
+    lvalidation = True 
     patience = 10
     
 # Define parametros de la red
 class net:
-    hidden=40
+    hidden_dim=40
     layers=3
+    input_dim=len(dat.var_in)
+    output_dim=len(dat.var_out)
     dropout=0.1
     device=device
 
 
 
-    

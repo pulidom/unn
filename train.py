@@ -42,12 +42,12 @@ def train(Net,train_loader,val_loader,conf):
         print('cost train',loss_t[i_epoch])
 
         # Validation
-        if conf.lval: # cada cuantas epocas???
+        if conf.lvalidation: # cada cuantas epocas???
             Net.eval() 
             with torch.no_grad():
                 val_loss=0
                 for i_batch,  (input_dat,target_dat) in enumerate(val_loader):
-                    prediction = Net(input_dat)
+                    prediction = Net.train_step(input_dat)
                     cost = loss( prediction, target_dat )
                     val_loss += cost.item()
 

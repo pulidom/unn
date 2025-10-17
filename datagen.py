@@ -12,16 +12,17 @@ import dyn
 
 def create_dataloaders(conf):
     """
-    Versión simple que solo devuelve los dataloaders
+    Lee o genera los datos y luego carga los data loaders
     """
 
-    Mdl = conf.Dyn_Mdl()
+    Mdl = conf.DynMdl()
     loaders = []
     
     for file, nt, batch_size, shuffle in [
             ('train.npz', conf.n_train, conf.batch_size, True),
             ('val.npz', conf.n_val, conf.n_val, False) ]:
-        
+
+        print(conf.exp_dir + '/' + file, nt)
         dat = Mdl.read_ts(conf.exp_dir + '/' + file, nt=nt)
         dset = DriveData(dat, nt_in=conf.nt_jump, nt_out=conf.nt_window, 
                             jvar_in=conf.var_in, jvar_out=conf.var_out)

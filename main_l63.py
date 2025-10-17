@@ -8,13 +8,14 @@ import matplotlib.pyplot as plt
 import torch
 import datagen as dat
 import net
+from train import train
 # conf para el modelo dinamico
 import conf_l63 as conf
 
 # Generate training dataset
-loader_train, loader_val = dat.create_dataloaders(conf)
+loader_train, loader_val = dat.create_dataloaders(conf.dat)
 # Neural net
 Net = net.Net(conf.net)
 # Training
-best_net,loss_t,loss_v = train( Net,train_loader,val_loader,conf.train )
+best_net,loss_t,loss_v = train( Net,loader_train,loader_val,conf.train )
 

@@ -18,7 +18,8 @@ class Net(nn.Module):
     
     def __init__(self, conf):
         '''
-        We define a recurrent network that predicts the future values of a time-dependent variable based on
+        We define a recurrent network that predicts the future values 
+        of a time-dependent variable based on
         past inputs and covariates.
         '''
         super().__init__()
@@ -30,13 +31,11 @@ class Net(nn.Module):
                             bias=True,
                             batch_first=False,
                             dropout=conf.dropout)
-        self.initialize_forget_gate()
- 
-        self.return_state =conf.return_state
-
+        
+        self.initialize_forget_gate() 
+        self.return_state =True #conf.return_state
         self.output_dim = conf.output_dim
 
-        self.relu = nn.ReLU()
         # Capas finales transforman: hidden_dim -> output_dim 
         self.distribution_mu = nn.Linear(conf.hidden_dim * conf.layers, conf.output_dim)
         self.distribution_sigma = nn.Sequential(
@@ -61,8 +60,8 @@ class Net(nn.Module):
         # use h from all three layers to calculate mu and sigma
         hidden_permute = hidden.permute(1, 2, 0).contiguous().view(hidden.shape[1], -1)
         mu = self.distribution_mu(hidden_permute)
-        sigma = self.distribution_sigma(hidden_permute)  
-        outputs = torch.squeeze(mu), torch.squeeze(sigma)
+        sigma = self.distribution_sigma(hidden_permute)
+        outputs = mu, sigma # torch.squeeze(mu), torch.squeeze(sigma)
 
         #mu and sigma shape [batch_size, conf.output_dim]
         if self.return_state:
@@ -89,7 +88,8 @@ class Net(nn.Module):
 
     def train_step(self, train_batch):
         '''
-        Para el entrenamiento forward pass in the training time window with teacher forcing.
+        Para el entrenamiento forward pass in the training time window 
+        with teacher forcing.
         
         '''
         batch_size = train_batch.shape[1]
@@ -104,7 +104,7 @@ class Net(nn.Module):
 
         for t in range(seq_len):
             
-            mu_t[t], sigma_t[t], (hidden, cell) = self.forward(
+            (mu_t[t], sigma_t[t]), (hidden, cell) = self.forward(
                 train_batch[t].unsqueeze_(0).clone(), 
                  (hidden, cell)
             )
