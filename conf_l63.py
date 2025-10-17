@@ -2,6 +2,7 @@
 #import numpy as np
 
 from dyn import L63 as Dyn_Mdl
+import lossfn
 
 #device = 'cuda' if torch.cuda.is_available() else 'cpu'
 device='cpu'
@@ -24,7 +25,7 @@ class dat:
 
 # Define parametros de la optimizacion
 class train: 
-    loss = #nn.MSELoss() #nn.logGaussLoss #SupervLoss # GaussLoss
+    loss = lossfn.loss_fn #nn.MSELoss() #nn.logGaussLoss #SupervLoss # GaussLoss
     batch_size=256
     n_epochs = 30
     learning_rate = 1e-3
