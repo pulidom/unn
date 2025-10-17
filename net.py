@@ -1,10 +1,8 @@
 '''Defines the recursive neural network
     Version preliminar tomada de deepar
-    Cambios a realizar: 
-     1. saco idx/embeddings 
-     2. manejo hidden y cell como variables self. para evitar la entrada
-     3. sacar el factor de scaling de la pred
-     4. la otra porqueria de este codigo es que a la salida del forward se hace el paso a paso en lugar de considerar toda la secuencia. me gustaria hacer el paso a paso en el forward y que salga la secuencia afuera y eventualmente comparar con un forward que haga todo a la ves (multistep ver abajo)
+     Se la piensa para sistemas dinamicos. 
+     Se la hace mas eficiente.
+     Se maneja teacher forcing y prediccion desde la propia clase Net
 '''
 
 import math
