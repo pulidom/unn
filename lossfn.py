@@ -1,7 +1,7 @@
 
 
 
-def loss_fn(in_var: Variable, labels: Variable):
+def loss_fn(in_var, labels):
     '''
     Compute using gaussian the log-likehood which needs to be maximized. Ignore time steps where labels are missing.
     Args:
