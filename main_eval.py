@@ -13,12 +13,12 @@ from train import train
 import conf_l63 as conf
 
 # Generate training dataset
-loader_test = dat.create_dataloaders(conf.dat,['test'])
+[loader_test] = dat.create_dataloaders(conf.dat,['test'])
 net_file = conf.exp_dir + '/model_best.ckpt'
 
 Net =torch.load(net_file,map_location=torch.device(conf.device))
 
-for i_batch, (input_dat,target_dat) in enumerate(train_loader):
-
+for i_batch, (input_dat,target_dat) in enumerate(loader_test):
+    print(input_dat.shape)
     prediction = Net.pred(input_dat)
     

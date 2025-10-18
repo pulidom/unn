@@ -28,7 +28,7 @@ def create_dataloaders(conf,dat_type=['train','val']):
 
         print(conf.exp_dir + '/' + file, nt)
         dat = Mdl.read_ts(conf.exp_dir + '/' + file, nt=nt)
-        dset = DriveData(dat, nt_in=conf.nt_jump, nt_out=conf.nt_window, 
+        dset = DriveData(dat, nt_in=1, nt_jump = conf.nt_jump, nt_out=conf.nt_window, 
                             jvar_in=conf.var_in, jvar_out=conf.var_out)
         loader = data.DataLoader(dset, batch_size=batch_size, shuffle=shuffle)
         loaders.append(loader)
@@ -54,13 +54,15 @@ class DriveData(Dataset):
                 dat=self.normalize_gauss(dat)
             elif normalize == 'min-max':
                 dat=self.normalize_minmax(dat)
-        
-        self.xs,self.ys = self.chunks(dat,nt_in,nt_out,
-                                      jvar_in,jvar_out,ldeepar=ldeepar)
+        print('dat',dat.shape)
+        self.xs,self.ys = self.chunks(dat,nt_in,nt_out,nt_jump,
+                                      jvar_in,jvar_out,
+                                      ldeepar=ldeepar)
 
         self.x_data = tor.from_numpy(np.asarray(self.xs,dtype=np.float32)).to(device)
         self.y_data = tor.from_numpy(np.asarray(self.ys,dtype=np.float32)).to(device)
 
+        
         self.lenx=self.xs.shape[0]
         
     def __getitem__(self,index):
@@ -77,13 +79,14 @@ class DriveData(Dataset):
         nchunks=var.shape[0]//n
         return var[:nchunks*n].reshape((nchunks,n,var.shape[-2],var.shape[-1]))
     
-    def chunks(self,dat,nt_in,nt_out,jvar_in,jvar_out,ldeepar=True):
+    def chunks(self,dat,nt_in,nt_out,nt_jump,jvar_in,jvar_out,ldeepar=True):
         """ Divide data in chunks for recursive NNs 
             Los covariates se asumen conocidos para el forecast
              No repite la entrada.
         """
 
-        dat=sliding_window_view(dat,(nt_in+nt_out,dat.shape[1]))[::nt_in+1, 0,...]
+        
+        dat=sliding_window_view(dat,(nt_in+nt_out,dat.shape[1]))[::nt_jump, 0,...]
         #saltos de nt_in para no repetir la entrada
 
         if ldeepar:

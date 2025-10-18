@@ -12,12 +12,11 @@ exp_dir= './dat/l63'
 
 # Define parametros de los datos
 class dat: 
-    n_train=20000
-    n_val = 501
+    n_train=200_000 # corresponde a ???
+    n_val = 40_000 # 10_000 corresponde a 100 muestras
 
     nt_jump=100   # salto de los datos
     nt_window=200  # total times
-    nt_start=100 # warm-up times/ input_times
 
     var_in=[0,2]
     var_out=[0]
@@ -35,7 +34,7 @@ class train:
     learning_rate = 1e-3
     exp_dir = exp_dir
     lvalidation = True 
-    patience = 10
+    patience = 30
     
 # Define parametros de la red
 class net:
@@ -45,6 +44,7 @@ class net:
     output_dim=len(dat.var_out)
     dropout=0.1
     device=device
-
-
+    nt_start=100 # warm-up times/ input_times
+    nt_window=dat.nt_window
+    n_samples = 100
 

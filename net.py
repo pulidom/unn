@@ -44,7 +44,7 @@ class Net(nn.Module):
         '''
         Predict mu and sigma of the distribution for z_t.
         Args:
-            x: ([1, batch_size, input_dim]): z_{t-1} + x_t, note that z_0 = 0
+             x: ([1, batch_size, input_dim]): z_{t-1} + x_t, note that z_0 = 0
             hidden ([layers, batch_size, hidden_dim]): LSTM h from time step t-1
             cell ([layers, batch_size, hidden_dim]): LSTM c from time step t-1
         Returns:
@@ -123,20 +123,20 @@ class Net(nn.Module):
         hidden = self.init_hidden(batch_size)
         cell = self.init_cell(batch_size)
 
-        mu = torch.zeros((batch_size, nt_window, self.output_dim), device=self.conf.device)
-        sigma = torch.zeros((batch_size, nt_window, self.output_dim), device=self.conf.device)
-        
+        mu = torch.zeros((nt_window, batch_size, self.output_dim), device=self.conf.device)
+        sigma = torch.zeros((nt_window, batch_size, self.output_dim), device=self.conf.device)
         for t in range(nt_start):
-            
-            mu_t[t], sigma_t[t], (hidden, cell) = self.forward(
+            print('t',t,x[t].unsqueeze_(0).shape)
+            (mu[t], sigma[t]), (hidden, cell) = self.forward(
                 x[t].unsqueeze_(0).clone(), 
                  (hidden, cell)     )
-
+#### que hago con los covariates????
+#### necesito ir tomando los valores correctos
         if deterministic:
             for t in range(nt_start,self.conf.nt_window):
-            
-                mu_t[t], sigma_t[t], (hidden, cell) = self.forward(
-                    mu_t[t-1].unsqueeze_(0).clone(), 
+                xaug=torch.cat([mu[t-1],x[t-1,...,self.output_dim:]],dim=-1)
+                (mu[t], sigma[t]), (hidden, cell) = self.forward(
+                    xaug.unsqueeze_(0).clone(), 
                     (hidden, cell)     )
             
         else:
@@ -151,12 +151,13 @@ class Net(nn.Module):
             sampler = gaussian.sample(sample_shape=( n_samples * batch_size, self.output_dim))
 
             samples[0] = sampler.view(n_samples,batch_size, self.output_dim)
+            ### xaug=torch.cat([mu[t-1],x[t-1,...,self.output_dim:]],dim=-1)
             
             for t in range(nt_start,self.conf.nt_window):
 
 ### tengo que replicar la hidden y la cell original...
                 
-                mu_samples, sigma_samples, (hidden, cell) = self.forward(
+                (mu_samples, sigma_samples), (hidden, cell) = self.forward(
                     sampler.unsqueeze_(0).clone(), 
                     (hidden, cell)     )
 
