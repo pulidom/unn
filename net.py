@@ -125,49 +125,57 @@ class Net(nn.Module):
 
         mu = torch.zeros((nt_window, batch_size, self.output_dim), device=self.conf.device)
         sigma = torch.zeros((nt_window, batch_size, self.output_dim), device=self.conf.device)
+        # warming up period
         for t in range(nt_start):
             print('t',t,x[t].unsqueeze_(0).shape)
             (mu[t], sigma[t]), (hidden, cell) = self.forward(
                 x[t].unsqueeze_(0).clone(), 
                  (hidden, cell)     )
-#### que hago con los covariates????
-#### necesito ir tomando los valores correctos
+
+        # prediction period: 
         if deterministic:
             for t in range(nt_start,self.conf.nt_window):
                 xaug=torch.cat([mu[t-1],x[t-1,...,self.output_dim:]],dim=-1)
                 (mu[t], sigma[t]), (hidden, cell) = self.forward(
                     xaug.unsqueeze_(0).clone(), 
                     (hidden, cell)     )
-            
-        else:
+            return mu, sigma
+        else: # stochastic
             samples = torch.zeros(
                 nt_pred, n_samples,batch_size, 
                 self.output_dim,
                 device=self.conf.device
             )
-### tengo que mezclar los batches con los mu's de cada evolucion
-            
-            gaussian = torch.distributions.normal.Normal(mu[nt_start], sigma[nt_start])
-            sampler = gaussian.sample(sample_shape=( n_samples * batch_size, self.output_dim))
+            # replico para todas las muestras
+            hidden = hidden.repeat_interleave(n_samples, dim=1) 
+            cell = cell.repeat_interleave(n_samples, dim=1)
 
-            samples[0] = sampler.view(n_samples,batch_size, self.output_dim)
-            ### xaug=torch.cat([mu[t-1],x[t-1,...,self.output_dim:]],dim=-1)
-            
-            for t in range(nt_start,self.conf.nt_window):
+            # Inicializo 
+            mu_rep = mu[nt_start-1].unsqueeze(0).repeat(n_samples, 1, 1)  # [n_samples, batch_size, output_dim]
+            sigma_rep = sigma[nt_start-1].unsqueeze(0).repeat(n_samples, 1, 1) 
 
-### tengo que replicar la hidden y la cell original...
-                
+            gaussian = torch.distributions.normal.Normal(mu_rep, sigma_rep)
+            sampler = gaussian.sample()  # [n_samples, batch_size, output_dim]
+            samples[0] = sampler.view(n_samples * batch_size, self.output_dim)
+
+            # Prediction with Autoregression 
+            for t in range(nt_start, nt_window):
+                covariates = x[t, :, self.output_dim:].repeat_interleave(n_samples, dim=0)
+
+                xaug = torch.cat([sampler_flat, covariates], dim=-1)
+
                 (mu_samples, sigma_samples), (hidden, cell) = self.forward(
-                    sampler.unsqueeze_(0).clone(), 
-                    (hidden, cell)     )
+                    xaug.unsqueeze(0).clone(),
+                    (hidden, cell)
+                )
 
-                gaussian = torch.distributions.normal.Normal(mu_samples, sigma_samples)
+                gaussian = torch.distributions.normal.Normal(mu_samples.squeeze(0), sigma_samples.squeeze(0))
                 sampler = gaussian.sample()
-                
-                samples[t-nt_start]=sampler.view(n_samples,batch_size, self.output_dim)
-                mu[t] = torch.median(samples[t],dim=0)[0]
-                sigma[t] = samples[t].std(dim=0)
-                
-            return mu, sigma, samples
 
+                samples[t-nt_start] = sampler.view(n_samples, batch_size, self.output_dim)
+                mu[t] = torch.median(samples[t - nt_start], dim=0)[0]
+                sigma[t] = samples[t - nt_start].std(dim=0)
+
+            return mu, sigma, samples
+            
 
