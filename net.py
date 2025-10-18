@@ -127,7 +127,6 @@ class Net(nn.Module):
         sigma = torch.zeros((nt_window, batch_size, self.output_dim), device=self.conf.device)
         # warming up period
         for t in range(nt_start):
-            print('t',t,x[t].unsqueeze_(0).shape)
             (mu[t], sigma[t]), (hidden, cell) = self.forward(
                 x[t].unsqueeze_(0).clone(), 
                  (hidden, cell)     )
@@ -155,14 +154,12 @@ class Net(nn.Module):
             sigma_rep = sigma[nt_start-1].unsqueeze(0).repeat(n_samples, 1, 1) 
 
             gaussian = torch.distributions.normal.Normal(mu_rep, sigma_rep)
-            sampler = gaussian.sample()  # [n_samples, batch_size, output_dim]
-            samples[0] = sampler.view(n_samples * batch_size, self.output_dim)
-
+            sampler = gaussian.sample().view(n_samples * batch_size, self.output_dim)
+            
             # Prediction with Autoregression 
             for t in range(nt_start, nt_window):
                 covariates = x[t, :, self.output_dim:].repeat_interleave(n_samples, dim=0)
-
-                xaug = torch.cat([sampler_flat, covariates], dim=-1)
+                xaug = torch.cat([sampler, covariates], dim=-1)
 
                 (mu_samples, sigma_samples), (hidden, cell) = self.forward(
                     xaug.unsqueeze(0).clone(),
@@ -175,7 +172,7 @@ class Net(nn.Module):
                 samples[t-nt_start] = sampler.view(n_samples, batch_size, self.output_dim)
                 mu[t] = torch.median(samples[t - nt_start], dim=0)[0]
                 sigma[t] = samples[t - nt_start].std(dim=0)
-
+            # samples [n_sample, nt_window-nt_start,batch_size,output_dim]
             return mu, sigma, samples
             
 

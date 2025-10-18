@@ -54,7 +54,7 @@ class DriveData(Dataset):
                 dat=self.normalize_gauss(dat)
             elif normalize == 'min-max':
                 dat=self.normalize_minmax(dat)
-        print('dat',dat.shape)
+        print('data shape: ',dat.shape)
         self.xs,self.ys = self.chunks(dat,nt_in,nt_out,nt_jump,
                                       jvar_in,jvar_out,
                                       ldeepar=ldeepar)

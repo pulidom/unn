@@ -18,7 +18,7 @@ net_file = conf.exp_dir + '/model_best.ckpt'
 
 Net =torch.load(net_file,map_location=torch.device(conf.device))
 
+print('Making inferences')
 for i_batch, (input_dat,target_dat) in enumerate(loader_test):
-    print(input_dat.shape)
-    prediction = Net.pred(input_dat)
+    prediction = Net.pred(input_dat, deterministic=False)
     
