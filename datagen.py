@@ -10,17 +10,21 @@ from torch.utils.data import Dataset
 from torch.utils import data 
 import dyn
 
-def create_dataloaders(conf):
+def create_dataloaders(conf,dat_type=['train','val']):
     """
     Lee o genera los datos y luego carga los data loaders
     """
 
     Mdl = conf.DynMdl()
-    loaders = []
     
-    for file, nt, batch_size, shuffle in [
-            ('train.npz', conf.n_train, conf.batch_size, True),
-            ('val.npz', conf.n_val, conf.n_val, False) ]:
+    dat_spec = {'train' : ('train.npz', conf.n_train, conf.batch_size, True),
+                'val' : ('val.npz', conf.n_val, conf.n_val, False),
+                'test' : ('test.npz', conf.n_val, conf.n_val, False),}
+
+    loaders = []
+    for dat_name in dat_type:
+        
+        file, nt, batch_size, shuffle = dat_spec[dat_name]
 
         print(conf.exp_dir + '/' + file, nt)
         dat = Mdl.read_ts(conf.exp_dir + '/' + file, nt=nt)
@@ -29,7 +33,7 @@ def create_dataloaders(conf):
         loader = data.DataLoader(dset, batch_size=batch_size, shuffle=shuffle)
         loaders.append(loader)
     
-    return loaders[0], loaders[1]
+    return loaders #loaders[0], loaders[1]
 
 class DriveData(Dataset):
     """ Dada la serie de tiempos la deja lista para utilizar con el DataLoader de pytorch 

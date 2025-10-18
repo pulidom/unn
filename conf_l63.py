@@ -17,7 +17,7 @@ class dat:
 
     nt_jump=100   # salto de los datos
     nt_window=200  # total times
-    nt_start=100 # warm-up times
+    nt_start=100 # warm-up times/ input_times
 
     var_in=[0,2]
     var_out=[0]
