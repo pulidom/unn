@@ -1,5 +1,7 @@
 import torch
 from torch.distributions import Normal
+import math
+EPS=1.e-9
 
 def leadtime_rmse(target,pred):
     ''' rmse en fn del lead time [seq,batch,output_dim]'''

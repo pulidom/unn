@@ -60,7 +60,7 @@ def train(Net,train_loader,val_loader,conf):
                 if loss_v[i_epoch] < best_mse:
                     best_mse = loss_v[i_epoch]
                     tolerate_iter = 0 
-                    model_file=os.path.join(conf.exp_dir, f'model_best.ckpt')
+                    model_file=os.path.join(conf.exp_dir, f'model_{conf.sexp}_best.ckpt')
                     torch.save(Net,model_file)
                     best_net = copy.deepcopy(Net)
 
@@ -73,7 +73,7 @@ def train(Net,train_loader,val_loader,conf):
     #----------->
     np.savez(conf.exp_dir+f'/rmses.npz', losstrain=loss_t,lossval=loss_v)
     if best_net is None:
-        model_file=os.path.join(conf.exp_dir, f'model_last.ckpt')
+        model_file=os.path.join(conf.exp_dir, f'model_{conf.sexp}_last.ckpt')
         torch.save(Net,model_file)
         best_net=Net
         

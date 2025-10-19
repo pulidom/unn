@@ -41,10 +41,15 @@ class Net(nn.Module):
         self.output_dim = conf.output_dim
 
         # Capas finales transforman: hidden_dim -> output_dim 
-        self.FC_mu = nn.Linear(conf.hidden_dim * conf.layers, conf.output_dim)
+        self.FC_mu = nn.Linear(conf.hidden_dim, conf.output_dim)
         self.FC_sigma = nn.Sequential(
-            nn.Linear(conf.hidden_dim * conf.layers, conf.output_dim),
+            nn.Linear(conf.hidden_dim, conf.output_dim),
             nn.Softplus(),) # softplus to make sure standard deviation is positive
+        
+        #self.FC_mu = nn.Linear(conf.hidden_dim * conf.layers, conf.output_dim)
+        #self.FC_sigma = nn.Sequential(
+        #    nn.Linear(conf.hidden_dim * conf.layers, conf.output_dim),
+        #    nn.Softplus(),) # softplus to make sure standard deviation is positive
 
     def forward(self, input, hx=None):
         '''
@@ -63,13 +68,13 @@ class Net(nn.Module):
         output, (hidden, cell) = self.lstm(input, hx)
 
         # use hidden stt from all the LSTM layers to calculate mu and sigma
-        hidden_permute = hidden.permute(1, 2, 0).contiguous().view(hidden.shape[1], -1)
-        mu = self.FC_mu(hidden_permute)
-        sigma = self.FC_sigma(hidden_permute)
+        #hidden_permute = hidden.permute(1, 2, 0).contiguous().view(hidden.shape[1], -1)
+        #mu = self.FC_mu(hidden_permute)
+        #sigma = self.FC_sigma(hidden_permute)
 
         # Directly from ouptput of LSTM
-        #mu = self.FC_mu(output)
-        #sigma = self.FC_sigma(output)
+        mu = self.FC_mu(output)
+        sigma = self.FC_sigma(output)
 
         outputs = mu, sigma # torch.squeeze(mu), torch.squeeze(sigma)
 
@@ -141,7 +146,7 @@ class Net(nn.Module):
         mu = torch.zeros(nt_window, batch_size, self.output_dim, device=self.conf.device)
         sigma = torch.zeros(nt_window, batch_size, self.output_dim, device=self.conf.device)
         
-        model.eval()
+        self.eval()
         with torch.no_grad():
 
             # warming up period

@@ -9,9 +9,13 @@ device='cpu'
 
 seed=2
 exp_dir= './dat/l63'
+#sexp = 'fullhidden'
+sexp = 'outdir' #eval para comparaciones
 
 # Define parametros de los datos
-class dat: 
+class dat:
+    DynMdl=L63
+
     n_train=200_000 # corresponde a ???
     n_val = 40_000 # 10_000 corresponde a 100 muestras
 
@@ -20,8 +24,8 @@ class dat:
 
     var_in=[0,2]
     var_out=[0]
+    
     exp_dir=exp_dir
-    DynMdl=L63
     batch_size=256
     
 
@@ -35,6 +39,7 @@ class train:
     exp_dir = exp_dir
     lvalidation = True 
     patience = 30
+    sexp = sexp
     
 # Define parametros de la red
 class net:
