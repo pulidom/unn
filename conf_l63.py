@@ -9,8 +9,8 @@ device='cpu'
 
 seed=2
 exp_dir= './dat/l63'
-#sexp = 'fullhidden'
-sexp = 'outdir' #eval para comparaciones
+sexp = 'fullhidden'
+sexp2 = 'outdir' #eval para comparaciones
 
 # Define parametros de los datos
 class dat:
