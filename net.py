@@ -3,14 +3,19 @@
      Se la piensa para sistemas dinamicos. 
      Se la hace mas eficiente.
      Se maneja teacher forcing y prediccion desde la propia clase Net
+     Generalizo a multiples outputs
+     Covariates are inputs without ouput (at the last part of the input tensor)
+
 '''
 
 import math
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch.autograd import Variable
+from torch.distributions.normal import Normal
+from LSTM import LSTM # dropout from Gal & Ghahramani
+#import torch.nn.functional as F
+#from torch.autograd import Variable
 
 class Net(nn.Module):
     
@@ -23,6 +28,7 @@ class Net(nn.Module):
         super().__init__()
         self.conf = conf
         # LSTM transforma: input_dim -> hidden_dim
+        #self.lstm = LSTM(input_size=conf.input_dim,
         self.lstm = nn.LSTM(input_size=conf.input_dim,
                             hidden_size=conf.hidden_dim,
                             num_layers=conf.layers,
@@ -35,8 +41,8 @@ class Net(nn.Module):
         self.output_dim = conf.output_dim
 
         # Capas finales transforman: hidden_dim -> output_dim 
-        self.distribution_mu = nn.Linear(conf.hidden_dim * conf.layers, conf.output_dim)
-        self.distribution_sigma = nn.Sequential(
+        self.FC_mu = nn.Linear(conf.hidden_dim * conf.layers, conf.output_dim)
+        self.FC_sigma = nn.Sequential(
             nn.Linear(conf.hidden_dim * conf.layers, conf.output_dim),
             nn.Softplus(),) # softplus to make sure standard deviation is positive
 
@@ -56,10 +62,15 @@ class Net(nn.Module):
         
         output, (hidden, cell) = self.lstm(input, hx)
 
-        # use h from all three layers to calculate mu and sigma
+        # use hidden stt from all the LSTM layers to calculate mu and sigma
         hidden_permute = hidden.permute(1, 2, 0).contiguous().view(hidden.shape[1], -1)
-        mu = self.distribution_mu(hidden_permute)
-        sigma = self.distribution_sigma(hidden_permute)
+        mu = self.FC_mu(hidden_permute)
+        sigma = self.FC_sigma(hidden_permute)
+
+        # Directly from ouptput of LSTM
+        #mu = self.FC_mu(output)
+        #sigma = self.FC_sigma(output)
+
         outputs = mu, sigma # torch.squeeze(mu), torch.squeeze(sigma)
 
         #mu and sigma shape [batch_size, conf.output_dim]
@@ -69,10 +80,12 @@ class Net(nn.Module):
             return outputs
 
     def init_hidden(self, input_size):
-        return torch.zeros(self.conf.layers, input_size, self.conf.hidden_dim, device=self.conf.device)
+        return torch.zeros(self.conf.layers, input_size,
+                           self.conf.hidden_dim, device=self.conf.device)
 
     def init_cell(self, input_size):
-        return torch.zeros(self.conf.layers, input_size, self.conf.hidden_dim, device=self.conf.device)
+        return torch.zeros(self.conf.layers, input_size,
+                           self.conf.hidden_dim, device=self.conf.device)
     
     def initialize_forget_gate(self):
         ''' initialize LSTM forget gate bias to be 1 as recommended
@@ -121,11 +134,13 @@ class Net(nn.Module):
         nt_window = self.conf.nt_window
         nt_pred = nt_window - self.conf.nt_start
         n_samples = self.conf.n_samples
+        
         hidden = self.init_hidden(batch_size)
         cell = self.init_cell(batch_size)
 
-        mu = torch.zeros((nt_window, batch_size, self.output_dim), device=self.conf.device)
-        sigma = torch.zeros((nt_window, batch_size, self.output_dim), device=self.conf.device)
+        mu = torch.zeros(nt_window, batch_size, self.output_dim, device=self.conf.device)
+        sigma = torch.zeros(nt_window, batch_size, self.output_dim, device=self.conf.device)
+        
         model.eval()
         with torch.no_grad():
 
@@ -137,7 +152,7 @@ class Net(nn.Module):
 
             # prediction period: 
             if deterministic:
-                for t in range(nt_start,self.conf.nt_window):
+                for t in range(nt_start,nt_window):
                     xaug=torch.cat([mu[t-1],x[t-1,...,self.output_dim:]],dim=-1)
                     (mu[t], sigma[t]), (hidden, cell) = self.forward(
                         xaug.unsqueeze_(0).clone(), 
@@ -149,15 +164,15 @@ class Net(nn.Module):
                     self.output_dim,
                     device=self.conf.device
                 )
-                # replico para todas las muestras
+                # replico para todas las muestras el hidden state
                 hidden = hidden.repeat_interleave(n_samples, dim=1) 
                 cell = cell.repeat_interleave(n_samples, dim=1)
 
-                # Inicializo 
-                mu_rep = mu[nt_start-1].unsqueeze(0).repeat(n_samples, 1, 1)  # [n_samples, batch_size, output_dim]
+                # Inicializo con replicas [n_samples, batch_size, output_dim]
+                mu_rep = mu[nt_start-1].unsqueeze(0).repeat(n_samples, 1, 1)  
                 sigma_rep = sigma[nt_start-1].unsqueeze(0).repeat(n_samples, 1, 1) 
 
-                gaussian = torch.distributions.normal.Normal(mu_rep, sigma_rep)
+                gaussian = Normal(mu_rep, sigma_rep)
                 sampler = gaussian.sample().view(n_samples * batch_size, self.output_dim)
 
                 # Prediction with Autoregression 
@@ -170,7 +185,7 @@ class Net(nn.Module):
                         (hidden, cell)
                     )
 
-                    gaussian = torch.distributions.normal.Normal(mu_samples.squeeze(0), sigma_samples.squeeze(0))
+                    gaussian = Normal(mu_samples.squeeze(0), sigma_samples.squeeze(0))
                     sampler = gaussian.sample()
 
                     samples[t-nt_start] = sampler.view(n_samples, batch_size, self.output_dim)

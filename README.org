@@ -1,0 +1,37 @@
+
+** State and Covariance prediction for dynamical systems with RNNs in Pytorch
+
+
+This code is based on the works by Salinas et al. and Sacco et al. While a Salinas work predict mean and variance, this code predicts the fullcovariance matrix prediction based on Sacco et al.
+
+
+Code was based on  <a href="https://github.com/husnejahan/DeepAR-pytorch"> DeepAR-pytorch </a>
+
+*** Authors
+
+Manuel Pulido
+
+Gaston Contardi
+
+Luciano Koval
+
+Tiago Perez
+
+Melani Torres
+
+
+GICA, FaCENA, Universidad Nacional del Nordeste
+
+
+*** How to use it
+
+**** To train
+
+
+**** To evaluate
+
+
+*** Some results
+
+
+
