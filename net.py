@@ -126,54 +126,57 @@ class Net(nn.Module):
 
         mu = torch.zeros((nt_window, batch_size, self.output_dim), device=self.conf.device)
         sigma = torch.zeros((nt_window, batch_size, self.output_dim), device=self.conf.device)
-        # warming up period
-        for t in range(nt_start):
-            (mu[t], sigma[t]), (hidden, cell) = self.forward(
-                x[t].unsqueeze_(0).clone(), 
-                 (hidden, cell)     )
+        model.eval()
+        with torch.no_grad():
 
-        # prediction period: 
-        if deterministic:
-            for t in range(nt_start,self.conf.nt_window):
-                xaug=torch.cat([mu[t-1],x[t-1,...,self.output_dim:]],dim=-1)
+            # warming up period
+            for t in range(nt_start):
                 (mu[t], sigma[t]), (hidden, cell) = self.forward(
-                    xaug.unsqueeze_(0).clone(), 
-                    (hidden, cell)     )
-            return mu, sigma
-        else: # stochastic
-            samples = torch.zeros(
-                nt_pred, n_samples,batch_size, 
-                self.output_dim,
-                device=self.conf.device
-            )
-            # replico para todas las muestras
-            hidden = hidden.repeat_interleave(n_samples, dim=1) 
-            cell = cell.repeat_interleave(n_samples, dim=1)
+                    x[t].unsqueeze_(0).clone(), 
+                     (hidden, cell)     )
 
-            # Inicializo 
-            mu_rep = mu[nt_start-1].unsqueeze(0).repeat(n_samples, 1, 1)  # [n_samples, batch_size, output_dim]
-            sigma_rep = sigma[nt_start-1].unsqueeze(0).repeat(n_samples, 1, 1) 
-
-            gaussian = torch.distributions.normal.Normal(mu_rep, sigma_rep)
-            sampler = gaussian.sample().view(n_samples * batch_size, self.output_dim)
-            
-            # Prediction with Autoregression 
-            for t in range(nt_start, nt_window):
-                covariates = x[t, :, self.output_dim:].repeat_interleave(n_samples, dim=0)
-                xaug = torch.cat([sampler, covariates], dim=-1)
-
-                (mu_samples, sigma_samples), (hidden, cell) = self.forward(
-                    xaug.unsqueeze(0).clone(),
-                    (hidden, cell)
+            # prediction period: 
+            if deterministic:
+                for t in range(nt_start,self.conf.nt_window):
+                    xaug=torch.cat([mu[t-1],x[t-1,...,self.output_dim:]],dim=-1)
+                    (mu[t], sigma[t]), (hidden, cell) = self.forward(
+                        xaug.unsqueeze_(0).clone(), 
+                        (hidden, cell)     )
+                return mu, sigma
+            else: # stochastic
+                samples = torch.zeros(
+                    nt_pred, n_samples,batch_size, 
+                    self.output_dim,
+                    device=self.conf.device
                 )
+                # replico para todas las muestras
+                hidden = hidden.repeat_interleave(n_samples, dim=1) 
+                cell = cell.repeat_interleave(n_samples, dim=1)
 
-                gaussian = torch.distributions.normal.Normal(mu_samples.squeeze(0), sigma_samples.squeeze(0))
-                sampler = gaussian.sample()
+                # Inicializo 
+                mu_rep = mu[nt_start-1].unsqueeze(0).repeat(n_samples, 1, 1)  # [n_samples, batch_size, output_dim]
+                sigma_rep = sigma[nt_start-1].unsqueeze(0).repeat(n_samples, 1, 1) 
 
-                samples[t-nt_start] = sampler.view(n_samples, batch_size, self.output_dim)
-                mu[t] = torch.median(samples[t - nt_start], dim=0)[0]
-                sigma[t] = samples[t - nt_start].std(dim=0)
-            # samples [n_sample, nt_window-nt_start,batch_size,output_dim]
-            return mu, sigma, samples
+                gaussian = torch.distributions.normal.Normal(mu_rep, sigma_rep)
+                sampler = gaussian.sample().view(n_samples * batch_size, self.output_dim)
+
+                # Prediction with Autoregression 
+                for t in range(nt_start, nt_window):
+                    covariates = x[t, :, self.output_dim:].repeat_interleave(n_samples, dim=0)
+                    xaug = torch.cat([sampler, covariates], dim=-1)
+
+                    (mu_samples, sigma_samples), (hidden, cell) = self.forward(
+                        xaug.unsqueeze(0).clone(),
+                        (hidden, cell)
+                    )
+
+                    gaussian = torch.distributions.normal.Normal(mu_samples.squeeze(0), sigma_samples.squeeze(0))
+                    sampler = gaussian.sample()
+
+                    samples[t-nt_start] = sampler.view(n_samples, batch_size, self.output_dim)
+                    mu[t] = torch.median(samples[t - nt_start], dim=0)[0]
+                    sigma[t] = samples[t - nt_start].std(dim=0)
+                # samples [n_sample, nt_window-nt_start,batch_size,output_dim]
+                return mu, sigma, samples
             
 
