@@ -20,5 +20,12 @@ Net =torch.load(net_file,map_location=torch.device(conf.device))
 
 print('Making inferences')
 for i_batch, (input_dat,target_dat) in enumerate(loader_test):
-    prediction = Net.pred(input_dat, deterministic=False)
-    
+    input_dat=input_dat.transpose(0,1)
+    target_dat=target_dat.transpose(0,1)
+
+    prediction = Net.pred(input_dat, deterministic=True)
+
+mu,sigma = prediction
+
+print(sigma.shape)
+print(target_dat.shape)

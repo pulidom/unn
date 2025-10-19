@@ -56,6 +56,7 @@ class M: # parent dynamical model class
             xt0,_=self.initialization()
 
             x=np.zeros((nt+1,self.nx))
+            x[0]=xt0
             for it in range(1,nt+1):
                 x[it]=self.integ(x[it-1])
                 

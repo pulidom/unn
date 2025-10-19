@@ -31,6 +31,9 @@ def train(Net,train_loader,val_loader,conf):
         for i_batch, (input_dat,target_dat) in enumerate(train_loader):
 
             optimizer.zero_grad()
+            input_dat=input_dat.transpose(0,1)
+            target_dat=target_dat.transpose(0,1)
+            
             prediction = Net.train_step(input_dat)
             cost = loss( prediction, target_dat)
 

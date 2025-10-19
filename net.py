@@ -53,6 +53,7 @@ class Net(nn.Module):
             hidden ([layers, batch_size, hidden_dim]): LSTM h from time step t
             cell ([layers, batch_size, hidden_dim]): LSTM c from time step t
         '''
+        
         output, (hidden, cell) = self.lstm(input, hx)
 
         # use h from all three layers to calculate mu and sigma
@@ -96,12 +97,11 @@ class Net(nn.Module):
         cell = self.init_cell(batch_size)
 
         self.return_state = True
-        
         mu_t = torch.zeros(seq_len, batch_size, self.output_dim, device=self.conf.device)
         sigma_t = torch.zeros(seq_len, batch_size, self.output_dim, device=self.conf.device)
 
         for t in range(seq_len):
-            
+
             (mu_t[t], sigma_t[t]), (hidden, cell) = self.forward(
                 train_batch[t].unsqueeze_(0).clone(), 
                  (hidden, cell)
@@ -113,8 +113,9 @@ class Net(nn.Module):
         ''' 
          Prediccion usando warmup time y luego si autoregresivo
            option deterministica o estocastica
-         x = [seq,batch,output_dim]
+          x = [seq,batch,output_dim]
         '''
+
         batch_size = x.shape[1]
         nt_start = self.conf.nt_start
         nt_window = self.conf.nt_window

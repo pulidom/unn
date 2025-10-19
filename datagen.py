@@ -85,7 +85,6 @@ class DriveData(Dataset):
              No repite la entrada.
         """
 
-        
         dat=sliding_window_view(dat,(nt_in+nt_out,dat.shape[1]))[::nt_jump, 0,...]
         #saltos de nt_in para no repetir la entrada
 
