@@ -27,66 +27,82 @@ class Net(nn.Module):
         '''
         super().__init__()
         self.conf = conf
-        # LSTM transforma: input_dim -> hidden_dim
-        #self.lstm = LSTM(input_size=conf.input_dim,
-        self.lstm = nn.LSTM(input_size=conf.input_dim,
-                            hidden_size=conf.hidden_dim,
-                            num_layers=conf.layers,
-                            bias=True,
-                            batch_first=False,
-                            dropout=conf.dropout)
+        
+        # Seleccionar LSTM o GRU
+        rnn_type = getattr(conf, 'rnn_type', 'LSTM')  # default LSTM
+        
+        if rnn_type == 'GRU':
+            self.rnn = nn.GRU(input_size=conf.input_dim,
+                               hidden_size=conf.hidden_dim,
+                               num_layers=conf.layers,
+                               bias=True,
+                               batch_first=False,
+                               dropout=conf.dropout)
+            self.is_lstm = False
+        else:  # LSTM
+            self.rnn = nn.LSTM(input_size=conf.input_dim,
+                                hidden_size=conf.hidden_dim,
+                                num_layers=conf.layers,
+                                bias=True,
+                                batch_first=False,
+                                dropout=conf.dropout)
+            self.is_lstm = True
         
         self.initialize_forget_gate() 
-        self.return_state =True #conf.return_state
+        self.return_state = True #conf.return_state
         self.output_dim = conf.output_dim
 
         # Capas finales transforman: hidden_dim -> output_dim 
-        #self.FC_mu = nn.Linear(conf.hidden_dim, conf.output_dim)
-        #self.FC_sigma = nn.Sequential(
-        #    nn.Linear(conf.hidden_dim, conf.output_dim),
-        #    nn.Softplus(),) # softplus to make sure standard deviation is positive
-        
-        self.FC_mu = nn.Linear(conf.hidden_dim * conf.layers, conf.output_dim)
+        self.FC_mu = nn.Linear(conf.hidden_dim, conf.output_dim)
         self.FC_sigma = nn.Sequential(
-            nn.Linear(conf.hidden_dim * conf.layers, conf.output_dim),
+            nn.Linear(conf.hidden_dim, conf.output_dim),
             nn.Softplus(),) # softplus to make sure standard deviation is positive
+        
+        #self.FC_mu = nn.Linear(conf.hidden_dim * conf.layers, conf.output_dim)
+        #self.FC_sigma = nn.Sequential(
+        #    nn.Linear(conf.hidden_dim * conf.layers, conf.output_dim),
+        #    nn.Softplus(),) # softplus to make sure standard deviation is positive
 
-    def forward(self, input, hx=None):
+    def forward(self, input, hidden_stt=None):
         '''
         Predict mu and sigma of the distribution for z_t.
         Args:
              x: ([1, batch_size, input_dim]): z_{t-1} + x_t, note that z_0 = 0
-            hidden ([layers, batch_size, hidden_dim]): LSTM h from time step t-1
-            cell ([layers, batch_size, hidden_dim]): LSTM c from time step t-1
+            hidden_stt: (hidden, cell) for LSTM or hidden for GRU
         Returns:
             mu ([batch_size]): estimated mean of z_t
             sigma ([batch_size]): estimated standard deviation of z_t
-            hidden ([layers, batch_size, hidden_dim]): LSTM h from time step t
-            cell ([layers, batch_size, hidden_dim]): LSTM c from time step t
+            hidden_stt: (hidden, cell) for LSTM or hidden for GRU
         '''
         
-        output, (hidden, cell) = self.lstm(input, hx)
+        output, hidden_stt = self.rnn(input, hidden_stt)
 
         # use hidden stt from all the LSTM layers to calculate mu and sigma
-        hidden_permute = hidden.permute(1, 2, 0).contiguous().view(hidden.shape[1], -1)
-        mu = self.FC_mu(hidden_permute)
-        sigma = self.FC_sigma(hidden_permute)
+        #hidden_permute = hidden.permute(1, 2, 0).contiguous().view(hidden.shape[1], -1)
+        #mu = self.FC_mu(hidden_permute)
+        #sigma = self.FC_sigma(hidden_permute)
 
         # Directly from ouptput of LSTM
-        #mu = self.FC_mu(output)
-        #sigma = self.FC_sigma(output)
+        mu = self.FC_mu(output)
+        sigma = self.FC_sigma(output)
 
         outputs = mu, sigma # torch.squeeze(mu), torch.squeeze(sigma)
 
         #mu and sigma shape [batch_size, conf.output_dim]
         if self.return_state:
-            return outputs, (hidden, cell)
+            return outputs, hidden_stt
         else:
             return outputs
 
     def init_hidden(self, input_size):
-        return torch.zeros(self.conf.layers, input_size,
+        hidden = torch.zeros(self.conf.layers, input_size,
                            self.conf.hidden_dim, device=self.conf.device)
+        if self.is_lstm:
+            cell = torch.zeros(self.conf.layers, input_size,
+                             self.conf.hidden_dim, device=self.conf.device)
+            return (hidden, cell)
+        else:
+            return hidden
 
     def init_cell(self, input_size):
         return torch.zeros(self.conf.layers, input_size,
@@ -96,23 +112,23 @@ class Net(nn.Module):
         ''' initialize LSTM forget gate bias to be 1 as recommended
         by http://proceedings.mlr.press/v37/jozefowicz15.pdf
         '''
-        for names in self.lstm._all_weights:
-            for name in filter(lambda n: "bias" in n, names):
-                bias = getattr(self.lstm, name)
-                n = bias.size(0)
-                start, end = n // 4, n // 2
-                bias.data[start:end].fill_(1.)  # Forget gate = 1
+        if self.is_lstm:
+            for names in self.rnn._all_weights:
+                for name in filter(lambda n: "bias" in n, names):
+                    bias = getattr(self.rnn, name)
+                    n = bias.size(0)
+                    start, end = n // 4, n // 2
+                    bias.data[start:end].fill_(1.)  # Forget gate = 1
 
     def train_step(self, train_batch):
         '''
         Para el entrenamiento forward pass in the training time window 
-        with teacher forcing.
+        con teacher forcing.
         
         '''
         batch_size = train_batch.shape[1]
         seq_len = train_batch.shape[0]
-        hidden = self.init_hidden(batch_size)
-        cell = self.init_cell(batch_size)
+        hidden_stt = self.init_hidden(batch_size)
 
         self.return_state = True
         mu_t = torch.zeros(seq_len, batch_size, self.output_dim, device=self.conf.device)
@@ -120,9 +136,9 @@ class Net(nn.Module):
 
         for t in range(seq_len):
 
-            (mu_t[t], sigma_t[t]), (hidden, cell) = self.forward(
+            (mu_t[t], sigma_t[t]), hidden_stt = self.forward(
                 train_batch[t].unsqueeze_(0).clone(), 
-                 (hidden, cell)
+                hidden_stt
             )
 
         return mu_t, sigma_t
@@ -140,8 +156,7 @@ class Net(nn.Module):
         nt_pred = nt_window - self.conf.nt_start
         n_samples = self.conf.n_samples
         
-        hidden = self.init_hidden(batch_size)
-        cell = self.init_cell(batch_size)
+        hidden_stt = self.init_hidden(batch_size)
 
         mu = torch.zeros(nt_window, batch_size, self.output_dim, device=self.conf.device)
         sigma = torch.zeros(nt_window, batch_size, self.output_dim, device=self.conf.device)
@@ -151,17 +166,17 @@ class Net(nn.Module):
 
             # warming up period
             for t in range(nt_start):
-                (mu[t], sigma[t]), (hidden, cell) = self.forward(
+                (mu[t], sigma[t]), hidden_stt = self.forward(
                     x[t].unsqueeze_(0).clone(), 
-                     (hidden, cell)     )
+                    hidden_stt)
 
             # prediction period: 
             if deterministic:
                 for t in range(nt_start,nt_window):
                     xaug=torch.cat([mu[t-1],x[t-1,...,self.output_dim:]],dim=-1)
-                    (mu[t], sigma[t]), (hidden, cell) = self.forward(
+                    (mu[t], sigma[t]), hidden_stt = self.forward(
                         xaug.unsqueeze_(0).clone(), 
-                        (hidden, cell)     )
+                        hidden_stt)
                 return mu, sigma
             else: # stochastic
                 samples = torch.zeros(
@@ -170,8 +185,13 @@ class Net(nn.Module):
                     device=self.conf.device
                 )
                 # replico para todas las muestras el hidden state
-                hidden = hidden.repeat_interleave(n_samples, dim=1) 
-                cell = cell.repeat_interleave(n_samples, dim=1)
+                if self.is_lstm:
+                    hidden, cell = hidden_stt
+                    hidden = hidden.repeat_interleave(n_samples, dim=1)
+                    cell = cell.repeat_interleave(n_samples, dim=1)
+                    hidden_stt = (hidden, cell)
+                else:
+                    hidden_stt = hidden_stt.repeat_interleave(n_samples, dim=1)
 
                 # Inicializo con replicas [n_samples, batch_size, output_dim]
                 mu_rep = mu[nt_start-1].unsqueeze(0).repeat(n_samples, 1, 1)  
@@ -185,9 +205,9 @@ class Net(nn.Module):
                     covariates = x[t, :, self.output_dim:].repeat_interleave(n_samples, dim=0)
                     xaug = torch.cat([sampler, covariates], dim=-1)
 
-                    (mu_samples, sigma_samples), (hidden, cell) = self.forward(
+                    (mu_samples, sigma_samples), hidden_stt = self.forward(
                         xaug.unsqueeze(0).clone(),
-                        (hidden, cell)
+                        hidden_stt
                     )
 
                     gaussian = Normal(mu_samples.squeeze(0), sigma_samples.squeeze(0))
@@ -198,5 +218,3 @@ class Net(nn.Module):
                     sigma[t] = samples[t - nt_start].std(dim=0)
                 # samples [n_sample, nt_window-nt_start,batch_size,output_dim]
                 return mu, sigma, samples
-            
-
